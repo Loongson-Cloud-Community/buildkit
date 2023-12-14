@@ -59,15 +59,8 @@ WORKDIR /usr/src
 
 # build runc binary
 FROM gobuild-base AS runc
-#ENV https_proxy="http://10.130.0.20:7890"
-RUN git clone -b loong64-1.1.7 --depth 1 https://github.com/Loongson-Cloud-Community/runc.git $GOPATH/src/github.com/opencontainers/runc
-#RUN unset https_proxy
-WORKDIR $GOPATH/src/github.com/opencontainers/runc
-RUN export GOPROXY=https://goproxy.cn
-ARG TARGETPLATFORM
 RUN set -e; apt update && apt install -y libc6-dev gcc libseccomp-dev libseccomp2
-RUN make static && mv runc /usr/bin
-RUN rm -rf $GOPATH/src/github.com/opencontainers/runc
+COPY runc /usr/bin
 
 FROM gobuild-base AS buildkit-base
 ENV GOFLAGS=-mod=vendor
@@ -81,21 +74,46 @@ FROM buildkit-base AS buildkit
 ENV CGO_ENABLED=0
 ARG TARGETPLATFORM
 RUN mkdir /src
-#COPY buildkit.tar.gz /src
-COPY buildkit-0.12.3.tar.gz /src
-#RUN tar -zxvf buildkit.tar.gz
+COPY buildkit.tar.gz /src
 WORKDIR /src
-RUN tar -zxvf buildkit-0.12.3.tar.gz
+RUN tar -zxvf buildkit.tar.gz
+#WORKDIR /src
 COPY .ldflags /tmp/.ldflags
 RUN go build -ldflags "$(cat /tmp/.ldflags) -extldflags '-static'" -tags "osusergo netgo static_build seccomp ${BUILDKITD_TAGS}" -o /usr/bin/buildkitd ./cmd/buildkitd \
     && go build -ldflags "$(cat /tmp/.ldflags)" -o /usr/bin/buildctl ./cmd/buildctl \
+#RUN go build -o /usr/bin/buildctl ./cmd/buildctl \
+#    && go build -o /usr/bin/buildkitd ./cmd/buildkitd \
     && rm -rf /src/*
+#COPY buildctl /usr/bin/buildctl
+#COPY buildkit /usr/bin/buildkitd
 
-#FROM lcr.loongnix.cn/library/tonistiigi/binfmt:latest AS binfmt-base
-FROM yangzewei2023/binfmt:qemu-8.0.5 AS binfmt-base
+FROM lcr.loongnix.cn/library/tonistiigi/binfmt:latest AS binfmt-base
+#SHELL ["/bin/sh", "-c"]
+#RUN cd /usr/bin && for f in $(ls qemu-*); do ln -s $f buildkit-$f; done
 
 FROM scratch AS binfmt
 COPY --from=binfmt-base /usr/bin/buildkit-qemu-* /
+COPY --from=binfmt-base / /
+
+
+#FROM git AS binaries-linux
+#RUN apt update && apt install -y libc6-dev gcc libseccomp-dev libseccomp2
+#COPY --from=runc /usr/bin/runc /buildkit-runc
+#COPY --from=lcr.loongnix.cn/library/tonistiigi/binfmt / /
+#COPY --from=buildkit /usr/bin/buildctl /
+#COPY --from=buildkit /usr/bin/buildkitd /
+
+#FROM binaries-linux AS binaries
+# enable scanning for this stage
+#ARG BUILDKIT_SBOM_SCAN_STAGE=true
+
+#FROM yangzewei2023/debian:sid AS releaser
+#RUN apk add --no-cache tar gzip
+#WORKDIR /work
+#ARG TARGETPLATFORM
+
+#FROM scratch AS release
+#COPY --from=releaser /out/ /
 
 FROM debianbase AS buildkit-export
 RUN apt update && apt install -y fuse3 git openssh-server pigz xz-utils 
@@ -106,17 +124,7 @@ VOLUME /var/lib/buildkit
 FROM gobuild-base AS containerd
 ARG CONTAINERD_VERSION
 ARG CONTAINERD_ALT_VERSION
-WORKDIR /usr/src
-#ENV https_proxy="http://10.130.0.20:7890"
-RUN  git clone -b loong64-v1.7.2 --depth 1 https://github.com/Loongson-Cloud-Community/containerd.git containerd && unset https_proxy
-#RUN cd containerd \
-#    && make bin/containerd \
-#    && make bin/containerd-shim-runc-v2 \
-#    && make bin/ctr \
-#    && mv bin /out
-RUN cd containerd \
-    && make STATIC=1 binaries \
-    && mv bin /out
+COPY ./bin/* /out
 
 FROM git AS binaries-linux
 RUN apt update && apt install -y libc6-dev gcc libseccomp-dev libseccomp2
@@ -137,15 +145,9 @@ ARG CONTAINERD_ALT_VERSION_16
 #ENV https_proxy="http://10.130.0.20:7890"
 RUN apt update && apt install -y btrfs-progs libbtrfsutil1 libbtrfs-dev libbtrfsutil-dev  \
     && rm -rf /usr/src/containerd  \
-    && export https_proxy="http://10.130.0.20:7890" \
-    && git clone -b loong64-v1.6.21 --depth 1 https://github.com/Loongson-Cloud-Community/containerd.git containerd \
-    && cd containerd && echo "$(ls -la bin)" && unset https_proxy \
-    && make STATIC=1 binaries \
-#    && make bin/containerd \
-#    && make bin/containerd-shim-runc-v2 \
-#    && make bin/ctr \
     && mkdir -p /usr/alt-16  mv bin /usr/alt-16 \
     && rm -rf /usr/src/tmp
+COPY ./bin-alt/* /usr/alt-16
 
 #ARG REGISTRY_VERSION
 #FROM yangzewei2023/distribution-registry:2.7.1-debian AS registry
