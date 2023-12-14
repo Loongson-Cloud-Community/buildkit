@@ -1,0 +1,1 @@
+-X buildkit/version.Version=0.12.3 -X buildkit/version.Revision=0.12.3 -X buildkir/version.Package=buildkit
