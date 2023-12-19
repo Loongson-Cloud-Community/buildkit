@@ -66,7 +66,7 @@ FROM buildkit-base AS buildkit
 ENV CGO_ENABLED=0
 ARG TARGETPLATFORM
 WORKDIR /src
-RUN wget -O https://github.com/Loongson-Cloud-Community/buildkit/releases/download/0.12.3/buildkit-0.12.3.tar.gz /src/buildkit-0.12.3.tar.gz \
+RUN wget https://github.com/Loongson-Cloud-Community/buildkit/releases/download/0.12.3/buildkit-0.12.3.tar.gz -O /src/buildkit-0.12.3.tar.gz \
     && tar -zxvf buildkit-0.12.3.tar.gz
 COPY .ldflags /tmp/.ldflags
 RUN  go build -ldflags "$(cat /tmp/.ldflags) -extldflags '-static'" -tags "osusergo netgo static_build seccomp ${BUILDKITD_TAGS}" -o /usr/bin/buildkitd ./cmd/buildkitd \
