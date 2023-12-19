@@ -72,7 +72,7 @@ RUN  go build -ldflags "$(cat /tmp/.ldflags) -extldflags '-static'" -tags "osuse
 
 FROM cr.loongnix.cn/tonistiigi/binfmt:latest AS binfmt-base
 FROM scratch AS binfmt
-COPY --link --from=binfmt-base /usr/bin/*qemu* /
+COPY --link --from=cr.loongnix.cn/tonistiigi/binfmt:latest /usr/bin/*qemu* /
 
 FROM debianbase AS buildkit-export
 RUN apt update && apt install -y fuse3 git openssh-server pigz xz-utils 
