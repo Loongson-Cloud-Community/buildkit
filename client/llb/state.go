@@ -684,6 +684,7 @@ var (
 	LinuxS390x   = Platform(ocispecs.Platform{OS: "linux", Architecture: "s390x"})
 	LinuxPpc64   = Platform(ocispecs.Platform{OS: "linux", Architecture: "ppc64"})
 	LinuxPpc64le = Platform(ocispecs.Platform{OS: "linux", Architecture: "ppc64le"})
+	LinuxLoong64 = Platform(ocispecs.Platform{OS: "linux", Architecture: "loong64"})
 	Darwin       = Platform(ocispecs.Platform{OS: "darwin", Architecture: "amd64"})
 	Windows      = Platform(ocispecs.Platform{OS: "windows", Architecture: "amd64"})
 )

@@ -1,0 +1,1 @@
+-X github.com/moby/buildkit/version.Version=v0.12.3.m -X github.com/moby/buildkit/version.Revision=438f47256f0decd64cc96084e22d3357da494c27.m -X github.com/moby/buildkit/version.Package=github.com/moby/buildkit   
