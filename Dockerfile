@@ -66,16 +66,13 @@ FROM buildkit-base AS buildkit
 ENV CGO_ENABLED=0
 ARG TARGETPLATFORM
 COPY .ldflags /tmp/.ldflags
-RUN --mount=target=. --mount=target=/root/.cache,type=cache \
-  --mount=target=/go/pkg/mod,type=cache \
-  go build -ldflags "$(cat /tmp/.ldflags) -extldflags '-static'" -tags "osusergo netgo static_build seccomp ${BUILDKITD_TAGS}" -o /usr/bin/buildkitd ./cmd/buildkitd \
+RUN  go build -ldflags "$(cat /tmp/.ldflags) -extldflags '-static'" -tags "osusergo netgo static_build seccomp ${BUILDKITD_TAGS}" -o /usr/bin/buildkitd ./cmd/buildkitd \
     && go build -ldflags "$(cat /tmp/.ldflags)" -o /usr/bin/buildctl ./cmd/buildctl \
     && rm -rf /src/* \
 
 FROM cr.loongnix.cn/tonistiigi/binfmt:latest AS binfmt-base
-
 FROM scratch AS binfmt
-COPY --from=binfmt-base /usr/bin/*qemu* /
+COPY --link --from=binfmt-base /usr/bin/*qemu* /
 
 FROM debianbase AS buildkit-export
 RUN apt update && apt install -y fuse3 git openssh-server pigz xz-utils 
