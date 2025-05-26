@@ -1,7 +1,7 @@
 ## syntax=docker/dockerfile-upstream:master
 
-ARG RUNC_VERSION=loong64-1.1.7
-ARG CONTAINERD_VERSION=v1.7.2
+ARG RUNC_VERSION=v1.3.0
+ARG CONTAINERD_VERSION=v2.0.2
 # containerd v1.6 for integration tests
 ARG CONTAINERD_ALT_VERSION_16=v1.6.21
 ARG REGISTRY_VERSION=2.8.0
@@ -16,7 +16,7 @@ ARG MINIO_MC_VERSION=RELEASE.2022-05-04T06-07-55Z
 ARG AZURITE_VERSION=3.18.0
 ARG GOTESTSUM_VERSION=v1.9.0
 
-ARG GO_VERSION=1.20
+ARG GO_VERSION=1.23
 ARG ALPINE_VERSION=3.21
 ARG XX_VERSION=1.3.0
 ARG BUILDPLATFORM=linux/loong64
@@ -44,18 +44,28 @@ COPY --link --from=xx / /
 FROM git AS runc-src
 ARG RUNC_VERSION
 WORKDIR /usr/src
-RUN git clone --depth 1 -b "$RUNC_VERSION" https://github.com/Loongson-Cloud-Community/runc.git runc 
+#RUN git clone --depth 1 -b "$RUNC_VERSION" https://github.com/Loongson-Cloud-Community/runc.git runc 
 
-# build runc binary
+# runc builds runc binary
 FROM gobuild-base AS runc
 WORKDIR $GOPATH/src/github.com/opencontainers/runc
+ARG RUNC_VERSION
+RUN git clone --branch "$RUNC_VERSION" https://github.com/opencontainers/runc.git .
 ARG TARGETPLATFORM
 # gcc is only installed for libgcc
 # lld has issues building static binaries for ppc so prefer ld for it
-RUN set -e; apk add musl-dev gcc libseccomp-dev libseccomp-static; \
-  [ "$(xx-info arch)" != "ppc64le" ] || XX_CC_PREFER_LINKER=ld xx-clang --setup-target-triple
-RUN --mount=from=runc-src,src=/usr/src/runc,target=. --mount=target=/root/.cache,type=cache \
-  CGO_ENABLED=1 xx-go build -mod=vendor -ldflags '-extldflags -static' -tags 'apparmor seccomp netgo cgo static_build osusergo' -o /usr/bin/runc ./ 
+RUN set -e; apk add curl musl-dev gcc libseccomp-dev libseccomp-static; \
+  [ "$(xx-info arch)" != "ppc64le" ] || XX_CC_PREFER_LINKER=ld xx-clang --setup-target-triple; \
+  curl -sSL "https://github.com/loong64/containerd-packaging/raw/refs/heads/main/runc.patch" | git apply; \
+  go get -u github.com/seccomp/libseccomp-golang@v0.10.1-0.20240814065753-28423ed7600d; \
+  go mod vendor; \
+  sed -i "s@--dirty @@g" Makefile
+RUN --mount=target=/root/.cache,type=cache <<EOT
+  set -ex
+  CGO_ENABLED=1 go build -mod=vendor -ldflags '-extldflags -static' -tags 'apparmor seccomp netgo cgo static_build osusergo' -o /usr/bin/runc ./
+  # xx-verify --static /usr/bin/runc
+  if [ "$(xx-info os)" = "linux" ]; then /usr/bin/runc --version; fi
+EOT
 
 
 FROM gobuild-base AS buildkit-base
@@ -112,6 +122,7 @@ ARG TARGETPLATFORM
 RUN --mount=from=dnsname-src,src=/usr/src/dnsname,target=.,rw \
     --mount=target=/root/.cache,type=cache \
     xx-go get -u golang.org/x/sys && \
+    go mod vendor && \
     CGO_ENABLED=0 xx-go build -o /usr/bin/dnsname ./plugins/meta/dnsname 
 
 
@@ -138,7 +149,7 @@ COPY --from=cni-plugins-export / /
 FROM scratch AS binaries-linux
 COPY --link --from=runc /usr/bin/runc /buildkit-runc
 # built from https://github.com/tonistiigi/binfmt/releases/tag/buildkit%2Fv7.1.0-30
-COPY --link --from=lcr.loongnix.cn/tonistiigi/binfmt:qemu-8.0.5 / /
+COPY --link --from=lcr.loongnix.cn/tonistiigi/binfmt:latest / /
 COPY --link --from=cni-plugins-export-squashed / /
 COPY --link --from=buildctl /usr/bin/buildctl /
 COPY --link --from=buildkitd /usr/bin/buildkitd /

@@ -14,6 +14,10 @@ default: image
 
 
 image:
-	docker build -t lcr.loongnix.cn/library/buildkit:0.12.3-alpine3.21 --build-arg https_proxy=$(https_proxy) --build-arg BUILDPLATFORM=linux/loong64 .
+	docker build -t lcr.loongnix.cn/library/buildkit:0.12.3-alpine3.21-runc-1.3.0 --build-arg https_proxy=$(https_proxy) --build-arg BUILDPLATFORM=linux/loong64 --build-arg http_proxy=http://10.130.0.14:7890 \
+  --build-arg GIT_TERMINAL_PROMPT=0 \
+  --build-arg GIT_SSL_NO_VERIFY=true \
+  --build-arg GIT_TRACE_PACKET=1 \
+  --build-arg GIT_TRACE=1 .
 push:
-	docker push lcr.loongnix.cn/library/buildkit:0.12.3-alpine3.21
+	docker push lcr.loongnix.cn/library/buildkit:0.12.3-alpine3.21-runc-1.3.0
